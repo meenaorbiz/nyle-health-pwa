@@ -1,0 +1,63 @@
+name: GCP Cloud Run CI/CD Pipeline
+
+on:
+  push:
+    branches:
+      - main      # Production Deployment
+      - test      # Staging Deployment
+
+env:
+  GCP_PROJECT_ID: ${{ secrets.GCP_PROJECT_ID }}
+  GCR_REGION: asia-south1 # Mumbai Region
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+
+      - name: Install Dependencies
+        run: npm ci
+
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@v2
+        with:
+          credentials_json: ${{ secrets.GCP_SA_KEY }}
+
+      - name: Set up Cloud SDK
+        uses: google-github-actions/setup-gcloud@v2
+
+      - name: Configure Docker for Artifact Registry
+        run: gcloud auth configure-docker ${GCR_REGION}-docker.pkg.dev --quiet
+
+      - name: Set Target Environment
+        run: |
+          if [ "${{ github.ref }}" == "refs/heads/main" ]; then
+            echo "SERVICE_NAME=nyle-health-pwa-prod" >> $GITHUB_ENV
+          else
+            echo "SERVICE_NAME=nyle-health-pwa-staging" >> $GITHUB_ENV
+          fi
+
+      - name: Build and Push Docker Container
+        run: |
+          IMAGE_URI="${GCR_REGION}-docker.pkg.dev/${GCP_PROJECT_ID}/nyle-pwa-repo/${SERVICE_NAME}:${{ github.sha }}"
+          docker build -t $IMAGE_URI .
+          docker push $IMAGE_URI
+          echo "IMAGE_URI=$IMAGE_URI" >> $GITHUB_ENV
+
+      - name: Deploy to Cloud Run
+        run: |
+          gcloud run deploy ${{ env.SERVICE_NAME }} \
+            --image=${{ env.IMAGE_URI }} \
+            --region=${{ env.GCR_REGION }} \
+            --platform=managed \
+            --allow-unauthenticated \
+            --set-env-vars="NEXT_PUBLIC_API_TARGET=cloud"
