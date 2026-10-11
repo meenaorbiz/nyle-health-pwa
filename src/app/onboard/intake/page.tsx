@@ -1,6 +1,8 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
+import { unlockMobileSpeech } from "@/utils/tts";
 import LanguageModal from "@/components/intake/LanguageModal";
 import IntakeProgressTracker from "@/components/intake/IntakeProgressTracker";
 import PatientIdentityCard from "@/components/intake/PatientIdentityCard";
@@ -11,6 +13,8 @@ import SymptomVoiceInput from "@/components/intake/SymptomVoiceInput";
 import FloatingIntakeDock from "@/components/intake/FloatingIntakeDock";
 
 export default function PatientIntakePage() {
+  const router = useRouter();
+
   // Session State
   const [firstName, setFirstName] = useState("Pooja");
   const [lastName, setLastName] = useState("Sharma");
@@ -38,6 +42,17 @@ export default function PatientIntakePage() {
         setIsRecording(false);
       }, 3000);
     }
+  };
+
+  // Pass demographic context in query params: e.g. /onboard?lang=hi&gender=male&firstName=Pooja
+  const handleBeginIntake = () => {
+    unlockMobileSpeech();
+    const params = new URLSearchParams({
+      lang: language.code,
+      gender: gender.toLowerCase(),
+      firstName: firstName,
+    });
+    router.push(`/onboard?${params.toString()}`);
   };
 
   return (
@@ -79,7 +94,7 @@ export default function PatientIntakePage() {
         estimatedMins={3}
       />
 
-      {/* 4. Identity Profile (Section 0) */}
+      {/* 4. Identity Profile */}
       <PatientIdentityCard
         firstName={firstName}
         lastName={lastName}
@@ -118,7 +133,7 @@ export default function PatientIntakePage() {
       {/* 7. Floating Bottom Dock */}
       <FloatingIntakeDock
         onSaveDraft={() => console.log("Draft saved")}
-        onNext={() => console.log("Proceeding to step 2")}
+        onNext={handleBeginIntake}
       />
 
     </div>
