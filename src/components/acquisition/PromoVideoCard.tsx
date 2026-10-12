@@ -1,12 +1,30 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 
 export default function PromoVideoCard() {
   const [videoEnabled, setVideoEnabled] = useState(true);
-  const [videoUrl, setVideoUrl] = useState("https://www.youtube.com/watch?v=nyle-dr-neha-welcome");
+  const [videoUrl, setVideoUrl] = useState("https://www.youtube.com/watch?v=dQw4w9WgXcQ");
   const [copiedUrlInput, setCopiedUrlInput] = useState(false);
   const [videoSaved, setVideoSaved] = useState(false);
+
+  // Load existing URL setting from API on mount
+  useEffect(() => {
+    async function loadSettings() {
+      try {
+        const res = await fetch("/api/playbooks");
+        if (res.ok) {
+          const data = await res.json();
+          if (data.welcomeVideoUrl) {
+            setVideoUrl(data.welcomeVideoUrl);
+          }
+        }
+      } catch (err) {
+        console.warn("Could not load video settings");
+      }
+    }
+    loadSettings();
+  }, []);
 
   // Helper to extract YouTube video ID for live preview
   const getYouTubeId = (url: string) => {
@@ -15,10 +33,17 @@ export default function PromoVideoCard() {
     return match && match[2].length === 11 ? match[2] : null;
   };
 
-  const videoId = getYouTubeId(videoUrl);
-
-  const handleSaveSettings = () => {
+  const handleSaveSettings = async () => {
     setVideoSaved(true);
+    try {
+      await fetch("/api/playbooks", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ welcomeVideoUrl: videoUrl }),
+      });
+    } catch (e) {
+      console.error("Failed to persist video URL", e);
+    }
     setTimeout(() => setVideoSaved(false), 2500);
   };
 
@@ -100,23 +125,15 @@ export default function PromoVideoCard() {
         </span>
       </div>
 
-      {/* Live Video Preview Frame */}
+      {/* Live Video Preview Frame with Dr. Neha Photo Thumbnail */}
       {videoEnabled && (
         <div className="relative w-full rounded-2xl bg-slate-900 p-2 shadow-inner">
           <div className="relative w-full aspect-video rounded-xl overflow-hidden bg-slate-800 group flex items-center justify-center">
-            {videoId ? (
-              <img
-                src={`https://img.youtube.com/vi/${videoId}/hqdefault.jpg`}
-                alt="Video Preview"
-                className="w-full h-full object-cover opacity-80"
-              />
-            ) : (
-              <img
-                src="https://i.pravatar.cc/600?img=47"
-                alt="Dr. Neha Jain"
-                className="w-full h-full object-cover opacity-70"
-              />
-            )}
+            <img
+              src="/dr-neha.jpg"
+              alt="Dr. Neha"
+              className="w-full h-full object-cover opacity-85"
+            />
             <div className="absolute top-2 left-2 right-2 flex items-center justify-between text-white">
               <div className="flex items-center gap-1.5 min-w-0 bg-black/50 backdrop-blur-md px-2.5 py-1 rounded-full">
                 <span className="w-2 h-2 rounded-full bg-red-500 animate-pulse" />

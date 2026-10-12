@@ -33,8 +33,27 @@ export default function AcquisitionPage() {
               Manage digital invite links, clinic desk QR displays, and patient onboarding video.
             </p>
           </div>
-          <div className="hidden sm:flex items-center justify-center w-10 h-10 rounded-full bg-[#d8e2ff] text-[#001a42] shadow-xs">
-            <span className="material-symbols-outlined text-2xl">group_add</span>
+          
+          {/* Right Action Container: Added Dr. Neha Badge next to existing group_add icon */}
+          <div className="flex items-center gap-3">
+            <div className="flex items-center gap-2 bg-white px-2.5 py-1 rounded-full border border-slate-200 shadow-xs shrink-0">
+              <div className="relative w-8 h-8 shrink-0">
+                <img
+                  src="/dr-neha.jpg"
+                  alt="Dr. Neha"
+                  className="w-8 h-8 rounded-full object-cover border border-emerald-500"
+                />
+                <span className="absolute bottom-0 right-0 w-2.5 h-2.5 bg-emerald-500 border border-white rounded-full"></span>
+              </div>
+              <div className="flex flex-col text-left">
+                <span className="text-xs font-bold text-slate-800 leading-none">Dr. Neha</span>
+                <span className="text-[9px] font-semibold text-emerald-600 leading-none mt-1">Super Admin</span>
+              </div>
+            </div>
+
+            <div className="hidden sm:flex items-center justify-center w-10 h-10 rounded-full bg-[#d8e2ff] text-[#001a42] shadow-xs">
+              <span className="material-symbols-outlined text-2xl">group_add</span>
+            </div>
           </div>
         </div>
       </div>

@@ -24,12 +24,25 @@ export default function AdminLogin() {
         <div className="w-full bg-white p-8 rounded-3xl shadow-[0_8px_30px_rgb(0,0,0,0.04)] border border-slate-100 flex flex-col items-center">
           
           {/* Logo Placement */}
-          <div className="w-28 h-28 mb-6 flex items-center justify-center bg-slate-50 rounded-2xl border border-slate-100 shadow-xs p-3">
+          <div className="w-24 h-24 mb-4 flex items-center justify-center bg-slate-50 rounded-2xl border border-slate-100 shadow-xs p-3">
              <img src="/logo.png" alt="Nyle Health" className="w-full h-full object-contain drop-shadow-sm" />
           </div>
 
+          {/* Dr. Neha Profile Avatar Badge */}
+          <div className="flex items-center gap-2 px-3 py-1 mb-3 rounded-full bg-emerald-50 border border-emerald-200/80 shadow-2xs">
+            <div className="relative w-6 h-6 shrink-0">
+              <img
+                src="/dr-neha.jpg"
+                alt="Dr. Neha"
+                className="w-6 h-6 rounded-full object-cover border border-emerald-500"
+              />
+              <span className="absolute bottom-0 right-0 w-2 h-2 bg-emerald-500 border border-white rounded-full"></span>
+            </div>
+            <span className="text-xs font-bold text-emerald-900">Dr. Neha Portal</span>
+          </div>
+
           <h1 className="text-2xl font-bold text-[#191c1e] mb-1">Welcome Back</h1>
-          <p className="text-sm text-slate-500 mb-8 text-center">Enter your credentials to access the clinical control center.</p>
+          <p className="text-sm text-slate-500 mb-6 text-center">Enter your credentials to access the clinical control center.</p>
 
           <form onSubmit={handleLogin} className="w-full flex flex-col gap-5">
             <div className="flex flex-col gap-1.5">

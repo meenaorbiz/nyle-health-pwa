@@ -2,9 +2,9 @@
 
 import { useState, useEffect, useRef, Suspense } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
-import { speakMobileText } from "@/utils/tts";
+import DoctorAvatar from "@/components/common/DoctorAvatar";
+import { speakText, stopSpeaking, getSpeechRecognition, unlockAudio } from "@/utils/speech";
 
-// Multi-step Clinical Playbooks (Gender -> Language -> Step Questions)
 type QuestionStep = {
   id: string;
   title: string;
@@ -107,10 +107,9 @@ function OnboardContent() {
 
   const playbook = CLINICAL_PLAYBOOKS[gender] || CLINICAL_PLAYBOOKS.female;
 
-  // Multi-step Flow State
   const [currentStepIndex, setCurrentStepIndex] = useState(0);
   const [answers, setAnswers] = useState<Record<string, string>>({});
-  const [currentInputText, setCurrentInputText] = useState("");
+  const [inputText, setInputText] = useState("");
   const [isListening, setIsListening] = useState(false);
   const [isCompleted, setIsCompleted] = useState(false);
 
@@ -120,31 +119,30 @@ function OnboardContent() {
   const questionText = currentQuestionObj?.question[lang] || currentQuestionObj?.question.en || "";
   const tokenSuggestions = currentQuestionObj?.tokens[lang] || currentQuestionObj?.tokens.en || [];
 
-  // Play voice prompt on each question change
   useEffect(() => {
     if (!isCompleted && questionText) {
-      speakMobileText(questionText, lang);
+      speakText(questionText, lang);
     }
+    return () => stopSpeaking();
   }, [currentStepIndex, questionText, lang, isCompleted]);
 
-  // STT Handlers
   const toggleListening = () => {
+    unlockAudio();
+
     if (isListening) {
       if (recognitionRef.current) recognitionRef.current.stop();
       setIsListening(false);
       return;
     }
 
-    const SpeechRecognition =
-      (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+    const recognition = getSpeechRecognition();
 
-    if (!SpeechRecognition) {
+    if (!recognition) {
       alert("Browser speech recognition unavailable. Please type your response.");
       return;
     }
 
     try {
-      const recognition = new SpeechRecognition();
       recognition.continuous = true;
       recognition.interimResults = true;
       recognition.lang = lang === "hi" ? "hi-IN" : lang === "es" ? "es-ES" : "en-IN";
@@ -155,7 +153,7 @@ function OnboardContent() {
         for (let i = 0; i < event.results.length; i++) {
           transcript += event.results[i][0].transcript;
         }
-        setCurrentInputText(transcript);
+        setInputText(transcript);
       };
       recognition.onerror = () => setIsListening(false);
       recognition.onend = () => setIsListening(false);
@@ -168,100 +166,103 @@ function OnboardContent() {
   };
 
   const handleAddToken = (token: string) => {
-    const trimmed = currentInputText.trim();
+    const trimmed = inputText.trim();
     if (!trimmed.includes(token)) {
-      setCurrentInputText(trimmed ? `${trimmed}, ${token}` : token);
+      setInputText(trimmed ? `${trimmed}, ${token}` : token);
     }
   };
 
-  // Next Question / Complete Handler
-  const handleConfirmStep = () => {
+  const handleNextStep = () => {
+    stopSpeaking();
     if (isListening && recognitionRef.current) {
       recognitionRef.current.stop();
     }
 
-    // Save current response
     const updatedAnswers = {
       ...answers,
-      [currentQuestionObj.id]: currentInputText.trim() || "No symptoms reported",
+      [currentQuestionObj.id]: inputText.trim() || "No symptoms reported",
     };
     setAnswers(updatedAnswers);
-    setCurrentInputText("");
+    setInputText("");
 
     if (currentStepIndex + 1 < playbook.length) {
-      // Advance to next question
       setCurrentStepIndex(currentStepIndex + 1);
     } else {
-      // Mark flow completed -> Show Review Summary
       setIsCompleted(true);
-      speakMobileText(`Thank you ${firstName}. Your intake summary is complete.`, lang);
+      speakText(`Thank you ${firstName}. Your intake summary is complete.`, lang);
     }
   };
 
-  // Final Cloud Submit Handler
   const handleSubmitIntake = () => {
     alert("Intake session successfully submitted to Dr. Neha!");
     router.push("/onboard/intake");
   };
 
   return (
-    <div className="min-h-screen bg-slate-50 p-4 max-w-md mx-auto flex flex-col justify-between relative">
-      <div>
-        {/* Top Header */}
-        <div className="flex items-center justify-between pb-3 mb-2 border-b border-slate-200">
-          <button
-            type="button"
-            onClick={() => {
-              if (currentStepIndex > 0 && !isCompleted) {
-                setCurrentStepIndex(currentStepIndex - 1);
-              } else {
-                router.back();
-              }
-            }}
-            className="w-8 h-8 flex items-center justify-center rounded-full bg-white shadow-xs border border-slate-200 text-slate-600"
-          >
-            ←
-          </button>
-          <div className="text-center">
-            <h2 className="font-bold text-slate-900 text-xs uppercase tracking-wider">
-              {isCompleted ? "Clinical Intake Summary" : currentQuestionObj?.title}
-            </h2>
-            <p className="text-[10px] text-slate-500">
-              {isCompleted ? "Final Step" : `Question ${currentStepIndex + 1} of ${playbook.length}`}
-            </p>
+    <div className="flex flex-col h-full justify-between">
+      {/* Header */}
+      <header className="flex items-center justify-between pb-2.5 border-b border-slate-200/80 shrink-0">
+        <button
+          type="button"
+          onClick={() => {
+            stopSpeaking();
+            if (currentStepIndex > 0 && !isCompleted) {
+              setCurrentStepIndex(currentStepIndex - 1);
+            } else {
+              router.back();
+            }
+          }}
+          className="w-7 h-7 flex items-center justify-center rounded-full bg-white border border-slate-200 text-slate-600 shadow-2xs shrink-0"
+        >
+          <span className="material-symbols-outlined text-sm">chevron_left</span>
+        </button>
+
+        <div className="text-center px-2 flex-1 min-w-0">
+          <h2 className="font-bold text-slate-900 text-xs uppercase tracking-wider truncate">
+            {isCompleted ? "Clinical Intake Summary" : currentQuestionObj?.title}
+          </h2>
+          <p className="text-[9px] text-slate-500 truncate">
+            {isCompleted ? "Final Step" : `Question ${currentStepIndex + 1} of ${playbook.length}`}
+          </p>
+        </div>
+
+        <div className="flex items-center gap-1.5 bg-white px-2 py-1 rounded-full border border-slate-200/80 shadow-2xs shrink-0">
+          <DoctorAvatar size="w-5 h-5" />
+          <div className="flex flex-col text-left">
+            <span className="text-[9px] font-bold text-slate-800 leading-none">Dr. Neha</span>
+            <span className="text-[7px] font-semibold text-emerald-600 leading-none mt-0.5">Active</span>
           </div>
-          <span className="text-[10px] bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded-full font-semibold">
-            Dr. Neha Active
-          </span>
         </div>
+      </header>
 
-        {/* Progress Bar */}
-        <div className="w-full bg-slate-200 h-1.5 rounded-full mb-4 overflow-hidden">
-          <div
-            className="bg-blue-600 h-full transition-all duration-300"
-            style={{
-              width: isCompleted
-                ? "100%"
-                : `${((currentStepIndex + 1) / playbook.length) * 100}%`,
-            }}
-          ></div>
-        </div>
+      {/* Progress Line */}
+      <div className="w-full bg-slate-200 h-1.5 rounded-full my-2 overflow-hidden shrink-0">
+        <div
+          className="bg-[#0057c0] h-full transition-all duration-300"
+          style={{
+            width: isCompleted
+              ? "100%"
+              : `${((currentStepIndex + 1) / playbook.length) * 100}%`,
+          }}
+        ></div>
+      </div>
 
-        {/* VIEW 1: ACTIVE QUESTION STEP */}
+      {/* Main Body */}
+      <div className="flex-1 overflow-y-auto py-2 space-y-3 scrollbar-none">
         {!isCompleted ? (
-          <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm space-y-4">
-            
-            {/* Dr. Neha Prompt Header */}
-            <div className="flex items-center justify-between bg-blue-50/80 border border-blue-100 rounded-xl p-3">
-              <div className="flex items-center gap-2">
-                <span className="text-lg">🎙️</span>
-                <p className="text-xs text-blue-900 font-medium leading-tight">
+          <div className="bg-white p-4 rounded-2xl border border-slate-200/80 shadow-2xs space-y-3.5">
+            {/* Dr Neha Prompt Box */}
+            <div className="flex items-center justify-between bg-blue-50/80 border border-blue-100 rounded-xl p-2.5">
+              <div className="flex items-center gap-2 min-w-0">
+                <span className="text-sm shrink-0">🎙️</span>
+                <p className="text-[10px] text-blue-900 font-medium leading-tight truncate">
                   <strong>Dr. Neha:</strong> "Please share your response in your preferred language."
                 </p>
               </div>
               <button
-                onClick={() => speakMobileText(questionText, lang)}
-                className="px-2 py-1 bg-white border border-blue-200 text-blue-700 text-[10px] font-bold rounded-lg shrink-0 shadow-xs"
+                type="button"
+                onClick={() => speakText(questionText, lang)}
+                className="px-2 py-0.5 bg-white border border-blue-200 text-blue-700 text-[9px] font-bold rounded-md shrink-0 shadow-2xs"
               >
                 Replay 🔊
               </button>
@@ -269,51 +270,51 @@ function OnboardContent() {
 
             {/* Tags */}
             <div className="flex items-center gap-1.5">
-              <span className="text-[10px] font-bold uppercase tracking-wider bg-slate-100 text-slate-600 px-2 py-0.5 rounded-md">
+              <span className="text-[9px] font-bold uppercase bg-slate-100 text-slate-600 px-2 py-0.5 rounded-md">
                 {gender}
               </span>
-              <span className="text-[10px] font-bold uppercase tracking-wider bg-slate-100 text-slate-600 px-2 py-0.5 rounded-md">
+              <span className="text-[9px] font-bold uppercase bg-slate-100 text-slate-600 px-2 py-0.5 rounded-md">
                 {lang.toUpperCase()}
               </span>
             </div>
 
-            {/* Question Text */}
-            <h3 className="text-base font-bold text-slate-900 leading-snug">
+            {/* Question */}
+            <h3 className="text-sm font-bold text-slate-900 leading-snug">
               {questionText}
             </h3>
 
-            {/* Voice Mic & Text Area */}
-            <div className="flex flex-col items-center justify-center p-4 bg-slate-50 border border-slate-200 rounded-xl gap-3">
+            {/* Mic & Text Area */}
+            <div className="flex flex-col items-center justify-center p-3 bg-slate-50 border border-slate-200/80 rounded-xl gap-2.5">
               <button
                 type="button"
                 onClick={toggleListening}
-                className={`w-14 h-14 rounded-full flex items-center justify-center transition-all ${
+                className={`w-12 h-12 rounded-full flex items-center justify-center transition-all ${
                   isListening
-                    ? "bg-red-500 text-white animate-pulse shadow-lg ring-4 ring-red-200"
-                    : "bg-emerald-600 text-white shadow-md hover:bg-emerald-700"
+                    ? "bg-red-500 text-white animate-pulse ring-4 ring-red-200"
+                    : "bg-emerald-600 text-white shadow-md active:scale-95"
                 }`}
               >
-                <span className="material-symbols-outlined text-2xl">
+                <span className="material-symbols-outlined text-xl">
                   {isListening ? "mic" : "mic_none"}
                 </span>
               </button>
 
-              <span className="text-[11px] font-semibold text-slate-600">
-                {isListening ? "🔴 Listening... Tap to finish" : "Tap Mic to Speak"}
+              <span className="text-[10px] font-semibold text-slate-600">
+                {isListening ? "🔴 Listening... Tap to stop" : "Tap Mic to Speak"}
               </span>
 
               <textarea
-                value={currentInputText}
-                onChange={(e) => setCurrentInputText(e.target.value)}
-                placeholder="Spoken text transcribes here automatically. Or type directly..."
+                value={inputText}
+                onChange={(e) => setInputText(e.target.value)}
+                placeholder="Spoken text transcribes here automatically..."
                 rows={3}
-                className="w-full text-xs p-3 bg-white border border-slate-200 rounded-lg text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500/50 resize-none"
+                className="w-full text-xs p-2.5 bg-white border border-slate-200 rounded-lg text-slate-800 placeholder-slate-400 focus:outline-none resize-none"
               />
             </div>
 
-            {/* Quick Select Tokens */}
+            {/* Tokens */}
             <div>
-              <p className="text-[10px] font-bold text-slate-400 uppercase mb-1.5 tracking-wider">
+              <p className="text-[9px] font-bold text-slate-400 uppercase mb-1.5 tracking-wider">
                 Quick Select Tokens
               </p>
               <div className="flex flex-wrap gap-1.5">
@@ -322,38 +323,32 @@ function OnboardContent() {
                     key={token}
                     type="button"
                     onClick={() => handleAddToken(token)}
-                    className="text-[11px] font-medium bg-emerald-50 text-emerald-700 border border-emerald-200/60 px-2.5 py-1 rounded-full"
+                    className="text-[10px] font-medium bg-emerald-50 text-emerald-700 border border-emerald-200/80 px-2 py-0.5 rounded-full"
                   >
                     + {token}
                   </button>
                 ))}
               </div>
             </div>
-
           </div>
         ) : (
-          /* VIEW 2: FINAL INTAKE REVIEW & SUMMARY */
-          <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm space-y-4">
-            <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-3 flex items-center gap-3">
-              <span className="text-2xl">✅</span>
+          /* Summary View */
+          <div className="bg-white p-4 rounded-2xl border border-slate-200/80 shadow-2xs space-y-3">
+            <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-2.5 flex items-center gap-2.5">
+              <span className="text-lg">✅</span>
               <div>
                 <h4 className="font-bold text-emerald-900 text-xs">Intake Session Complete</h4>
-                <p className="text-[11px] text-emerald-700">
-                  Review your answers before sending to Dr. Neha's clinical team.
+                <p className="text-[10px] text-emerald-700">
+                  Review your responses before sending to Dr. Neha.
                 </p>
               </div>
             </div>
 
-            <div className="space-y-3 divide-y divide-slate-100">
-              <div className="pt-2">
-                <p className="text-[10px] font-bold text-slate-400 uppercase">Patient</p>
-                <p className="text-sm font-semibold text-slate-800">{firstName} ({gender})</p>
-              </div>
-
+            <div className="space-y-2.5 divide-y divide-slate-100">
               {playbook.map((q) => (
                 <div key={q.id} className="pt-2">
-                  <p className="text-[10px] font-bold text-slate-400 uppercase">{q.title}</p>
-                  <p className="text-xs text-slate-600 italic mb-1">{q.question[lang] || q.question.en}</p>
+                  <p className="text-[9px] font-bold text-slate-400 uppercase">{q.title}</p>
+                  <p className="text-[11px] text-slate-600 italic mb-1">{q.question[lang] || q.question.en}</p>
                   <p className="text-xs font-semibold text-slate-900 bg-slate-50 p-2 rounded-lg border border-slate-200/60">
                     "{answers[q.id] || "No symptoms reported"}"
                   </p>
@@ -364,31 +359,35 @@ function OnboardContent() {
         )}
       </div>
 
-      {/* Bottom Action Button */}
-      {!isCompleted ? (
-        <button
-          onClick={handleConfirmStep}
-          className="w-full py-3.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-semibold shadow-md mt-6 mb-2 flex items-center justify-center gap-2"
-        >
-          <span>Confirm & Next</span>
-          <span className="text-sm">➔</span>
-        </button>
-      ) : (
-        <button
-          onClick={handleSubmitIntake}
-          className="w-full py-3.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-semibold shadow-md mt-6 mb-2 flex items-center justify-center gap-2"
-        >
-          <span>Submit to Dr. Neha</span>
-          <span className="text-sm">✓</span>
-        </button>
-      )}
+      {/* Footer CTA */}
+      <div className="pt-2 border-t border-slate-200/80 shrink-0">
+        {!isCompleted ? (
+          <button
+            type="button"
+            onClick={handleNextStep}
+            className="w-full py-3 bg-[#0057c0] hover:bg-[#004396] text-white text-xs font-bold rounded-xl shadow-md flex items-center justify-center gap-2 active:scale-98 transition-all"
+          >
+            <span>Confirm & Next</span>
+            <span className="material-symbols-outlined text-sm">arrow_forward</span>
+          </button>
+        ) : (
+          <button
+            type="button"
+            onClick={handleSubmitIntake}
+            className="w-full py-3 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-xl shadow-md flex items-center justify-center gap-2 active:scale-98 transition-all"
+          >
+            <span>Submit to Dr. Neha</span>
+            <span className="material-symbols-outlined text-sm">check</span>
+          </button>
+        )}
+      </div>
     </div>
   );
 }
 
 export default function OnboardPage() {
   return (
-    <Suspense fallback={<div className="p-4 text-center text-xs text-slate-500">Loading intake session...</div>}>
+    <Suspense fallback={<div className="p-4 text-center text-xs text-slate-500">Loading adaptive flow...</div>}>
       <OnboardContent />
     </Suspense>
   );
