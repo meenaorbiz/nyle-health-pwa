@@ -24,3 +24,19 @@ yarn-error.log*
 .env.development
 .env.production
 !.env.example
+
+# playwright
+playwright-report/
+# test-results/
+# node_modules/
+    .notes
+# Local Notes, Documents & Root Audio Samples
+.notes
+*.pptx
+/DrNeha-cloned-speech.wav
+
+# Playwright Test Artifacts
+/test-results/
+/playwright-report/
+/blob-report/
+/playwright/.cache/

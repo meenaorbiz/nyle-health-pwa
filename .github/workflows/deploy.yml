@@ -32,6 +32,23 @@ jobs:
           npm run lint --if-present
           npx tsc --noEmit
 
+      - name: Install Playwright Chromium
+        run: npx playwright install --with-deps chromium
+
+      - name: Run Playwright E2E Tests
+        run: npx playwright test
+        env:
+          CI: true
+          SARVAM_API_KEY: ${{ secrets.SARVAM_API_KEY }}
+
+      - name: Upload Playwright Report (On Failure)
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: playwright-report/
+          retention-days: 7
+
       - name: Authenticate to Google Cloud
         uses: google-github-actions/auth@v2
         with:
@@ -75,4 +92,4 @@ jobs:
             --region=${{ env.GCR_REGION }} \
             --platform=managed \
             --allow-unauthenticated \
-            --set-env-vars="NEXT_PUBLIC_API_TARGET=cloud"
+            --update-env-vars="NEXT_PUBLIC_API_TARGET=cloud,SARVAM_API_KEY=${{ secrets.SARVAM_API_KEY }}"
