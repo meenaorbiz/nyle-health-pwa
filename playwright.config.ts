@@ -1,5 +1,9 @@
 import { defineConfig, devices } from "@playwright/test";
 
+const targetUrl = process.env.BASE_URL || "http://localhost:3000";
+const isRemote = !!process.env.BASE_URL;
+const slowMoDelay = process.env.SLOW_MO ? parseInt(process.env.SLOW_MO, 10) : 0;
+
 export default defineConfig({
   testDir: "./tests/e2e",
   fullyParallel: false,
@@ -8,9 +12,12 @@ export default defineConfig({
   reporter: [["html", { open: "never" }], ["list"]],
 
   use: {
-    baseURL: "http://localhost:3000",
+    baseURL: targetUrl,
     trace: "on-first-retry",
     screenshot: "only-on-failure",
+    launchOptions: {
+      slowMo: slowMoDelay,
+    },
   },
 
   projects: [
@@ -24,11 +31,12 @@ export default defineConfig({
     },
   ],
 
-  /* Auto-boot Next.js dev server during local and CI test runs */
-  webServer: {
-    command: "npm run dev",
-    url: "http://localhost:3000",
-    reuseExistingServer: !process.env.CI,
-    timeout: 120 * 1000,
-  },
+  webServer: isRemote
+    ? undefined
+    : {
+        command: "npm run dev",
+        url: "http://localhost:3000",
+        reuseExistingServer: !process.env.CI,
+        timeout: 120 * 1000,
+      },
 });
